@@ -1,174 +1,121 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# Initialize session state
-if 'tippers' not in st.session_state:
-    st.session_state.tippers = {
-        'Tipper 1': {'kmr': 0, 'hmr': 0, 'last_service': None},
-        'Tipper 2': {'kmr': 0, 'hmr': 0, 'last_service': None},
-        'Tipper 3': {'kmr': 0, 'hmr': 0, 'last_service': None},
-        'Tipper 4': {'kmr': 0, 'hmr': 0, 'last_service': None},
-        'Tipper 5': {'kmr': 0, 'hmr': 0, 'last_service': None},
-        'Tipper 6': {'kmr': 0, 'hmr': 0, 'last_service': None},
-        'Tipper 7': {'kmr': 0, 'hmr': 0, 'last_service': None},
-        'Tipper 8': {'kmr': 0, 'hmr': 0, 'last_service': None},
-        'Tipper 9': {'kmr': 0, 'hmr': 0, 'last_service': None},
+# Load data function (in a real app, you'd load from Excel/DB)
+def load_tipper_data():
+    # This is a simplified version - in reality you'd load from the Excel file
+    data = {
+        'Asst.No: / Door No.': ['AL-1', 'AL-2', 'AL-3', 'AL-4', 'AL-5', 'AL-6', 'AL-7', 'AL-8', 'AL-9'],
+        'EQUIPMENT': ['TIPPER - 1', 'TIPPER - 2', 'TIPPER - 3', 'TIPPER - 4', 'TIPPER - 5', 'TIPPER - 6', 'TIPPER - 7', 'TIPPER - 8', 'TIPPER - 9'],
+        'M/c Sr.No: / Reg No:': ['AP39UQ0095', 'AP39UQ0097', 'AP39UW9881', 'AP39UW9880', 'AP39UY4651', 'AP39UY4652', 'AP39WC0926', 'AP39WC0927', 'AP39WC0928'],
+        'Commissioning Date': ['-', '-', '-', '-', '2024-08-30', '2024-08-30', '2025-02-14', '2025-02-14', '2025-02-14'],
+        'Current HMR': [5105.3, 5202.8, 2547, 2300, 1540, 1157, 0, 0, 0],
+        'Last Service Date': ['2025-04-16', '2025-04-16', '2025-04-08', '2025-03-15', '2025-03-20', '2025-01-25', '2025-02-14', '2025-02-14', '2025-02-14'],
+        'Next Engine Oil Change': [6105.3, 6202.8, 3547, 3300, 2540, 2157, 1000, 1000, 1000],
+        'Next Air Filter Change': [7105.3, 7202.8, 4547, 4300, 3540, 3157, 2000, 2000, 2000],
+        'Status': ['Operational', 'Operational', 'Operational', 'Operational', 'Operational', 'Operational', 'New', 'New', 'New']
     }
+    return pd.DataFrame(data)
 
-# Tier conditions and service intervals
-TIER_CONDITIONS = {
-    'Tier 1': {
-        'condition': "New or excellent condition (0-12 months)",
-        'service_interval_kmr': 5000,
-        'service_interval_hmr': 250,
-        'replacement_threshold_kmr': 100000,
-        'replacement_threshold_hmr': 5000
-    },
-    'Tier 2': {
-        'condition': "Good condition (12-24 months)",
-        'service_interval_kmr': 4500,
-        'service_interval_hmr': 200,
-        'replacement_threshold_kmr': 120000,
-        'replacement_threshold_hmr': 6000
-    },
-    'Tier 3': {
-        'condition': "Fair condition (24-36 months)",
-        'service_interval_kmr': 4000,
-        'service_interval_hmr': 150,
-        'replacement_threshold_kmr': 150000,
-        'replacement_threshold_hmr': 7500
-    },
-    'Tier 4': {
-        'condition': "Needs attention (36+ months)",
-        'service_interval_kmr': 3000,
-        'service_interval_hmr': 100,
-        'replacement_threshold_kmr': 200000,
-        'replacement_threshold_hmr': 10000
-    }
-}
-
-def update_tipper_data(tipper_name, kmr, hmr):
-    st.session_state.tippers[tipper_name]['kmr'] += kmr
-    st.session_state.tippers[tipper_name]['hmr'] += hmr
-    st.success(f"Updated {tipper_name}: +{kmr} KMR, +{hmr} HMR")
-
-def record_service(tipper_name):
-    st.session_state.tippers[tipper_name]['last_service'] = datetime.now().date()
-    st.success(f"Service recorded for {tipper_name} on {datetime.now().date()}")
-
-def calculate_next_service(tipper_name, tier):
-    if st.session_state.tippers[tipper_name]['last_service'] is None:
-        return "No service history"
+def main():
+    st.set_page_config(page_title="Tipper Maintenance Tracker", layout="wide")
     
-    last_service = st.session_state.tippers[tipper_name]['last_service']
-    kmr_since_service = st.session_state.tippers[tipper_name]['kmr']
-    hmr_since_service = st.session_state.tippers[tipper_name]['hmr']
+    st.title("Tipper Periodic Maintenance Tracker")
+    st.subheader("Angul Coal Mines - Mythri Infrastructure & Mining India Pvt Ltd")
     
-    tier_data = TIER_CONDITIONS[tier]
-    kmr_remaining = max(0, tier_data['service_interval_kmr'] - kmr_since_service)
-    hmr_remaining = max(0, tier_data['service_interval_hmr'] - hmr_since_service)
+    # Load data
+    df = load_tipper_data()
     
-    kmr_days = (kmr_remaining / (kmr_since_service / (datetime.now().date() - last_service).days)) if kmr_since_service > 0 else float('inf')
-    hmr_days = (hmr_remaining / (hmr_since_service / (datetime.now().date() - last_service).days)) if hmr_since_service > 0 else float('inf')
+    # Sidebar filters
+    st.sidebar.header("Filters")
+    status_filter = st.sidebar.selectbox("Status", ["All", "Operational", "New"])
+    due_filter = st.sidebar.checkbox("Show only due for service")
     
-    next_service_in = min(kmr_days, hmr_days)
+    # Apply filters
+    if status_filter != "All":
+        df = df[df['Status'] == status_filter]
     
-    if next_service_in == float('inf'):
-        return "Insufficient data to predict next service"
+    # Main display
+    col1, col2 = st.columns([3, 1])
     
-    next_service_date = datetime.now().date() + timedelta(days=int(next_service_in))
-    return f"Next service due in ~{int(next_service_in)} days ({next_service_date})"
-
-# App layout
-st.title("Tipper Fleet Management System")
-
-# Sidebar for navigation
-menu = st.sidebar.selectbox("Menu", ["Daily Update", "Tier Details", "Service Schedule"])
-
-if menu == "Daily Update":
-    st.header("Daily KMR/HMR Update")
-    
-    selected_tipper = st.selectbox("Select Tipper", list(st.session_state.tippers.keys()))
-    
-    col1, col2 = st.columns(2)
     with col1:
-        kmr = st.number_input("KMR to add", min_value=0, step=1)
+        st.subheader("Tipper Fleet Overview")
+        
+        # Display data table
+        st.dataframe(df, hide_index=True, use_container_width=True)
+        
+        # Detailed view for selected tipper
+        st.subheader("Tipper Details")
+        selected_tipper = st.selectbox("Select Tipper", df['Asst.No: / Door No.'])
+        
+        tipper_details = df[df['Asst.No: / Door No.'] == selected_tipper].iloc[0]
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("Asset Number", tipper_details['Asst.No: / Door No.'])
+            st.metric("Registration", tipper_details['M/c Sr.No: / Reg No:'])
+            st.metric("Current HMR", tipper_details['Current HMR'])
+            
+        with col2:
+            st.metric("Commission Date", tipper_details['Commissioning Date'])
+            st.metric("Last Service", tipper_details['Last Service Date'])
+            st.metric("Next Oil Change Due", tipper_details['Next Engine Oil Change'])
+        
+        # Maintenance history (would come from database in real app)
+        st.subheader("Maintenance History")
+        st.write("""
+        | Service Type       | Date       | HMR    | Next Due HMR |
+        |--------------------|------------|--------|--------------|
+        | Engine Oil Change  | 2025-04-16 | 5105.3 | 6105.3       |
+        | Air Filter Change  | 2025-01-10 | 4800   | 7105.3       |
+        | Brake Inspection  | 2024-12-15 | 4500   | 6500         |
+        """)
+    
     with col2:
-        hmr = st.number_input("HMR to add", min_value=0, step=1)
+        st.subheader("Maintenance Alerts")
+        
+        # Sample alerts (would be calculated in real app)
+        alert_data = [
+            {"Tipper": "AL-1", "Service": "Engine Oil Change", "Due HMR": 6105.3, "Current HMR": 5105.3, "Remaining": 1000},
+            {"Tipper": "AL-2", "Service": "Transmission Oil", "Due HMR": 5202.8, "Current HMR": 5202.8, "Remaining": 0},
+            {"Tipper": "AL-3", "Service": "Air Filter", "Due HMR": 3547, "Current HMR": 2547, "Remaining": 1000}
+        ]
+        
+        for alert in alert_data:
+            with st.expander(f"{alert['Tipper']} - {alert['Service']}"):
+                st.metric("Due At", alert['Due HMR'])
+                st.metric("Current HMR", alert['Current HMR'])
+                st.metric("Remaining", alert['Remaining'])
+                if st.button("Mark as Complete", key=f"complete_{alert['Tipper']}_{alert['Service']}"):
+                    st.success(f"Service recorded for {alert['Tipper']}")
+        
+        st.subheader("Quick Actions")
+        if st.button("Generate Monthly Report"):
+            st.info("Monthly maintenance report generated")
+        if st.button("Request Parts Order"):
+            st.info("Parts order request submitted")
     
-    if st.button("Update Tipper"):
-        update_tipper_data(selected_tipper, kmr, hmr)
-    
-    st.subheader("Current Tipper Status")
-    tipper_df = pd.DataFrame.from_dict(st.session_state.tippers, orient='index')
-    st.dataframe(tipper_df)
+    # Maintenance form
+    st.subheader("Record Maintenance")
+    with st.form("maintenance_form"):
+        tipper = st.selectbox("Tipper", df['Asst.No: / Door No.'])
+        service_type = st.selectbox("Service Type", [
+            "Engine Oil Change", 
+            "Air Filter Change", 
+            "Transmission Service",
+            "Brake Inspection",
+            "Coolant Change",
+            "Other"
+        ])
+        service_date = st.date_input("Service Date", datetime.today())
+        hmr = st.number_input("HMR at Service", min_value=0.0)
+        notes = st.text_area("Notes")
+        
+        submitted = st.form_submit_button("Record Service")
+        if submitted:
+            st.success(f"Recorded {service_type} for {tipper} on {service_date} at HMR {hmr}")
 
-elif menu == "Tier Details":
-    st.header("Tier Conditions and Specifications")
-    
-    selected_tier = st.selectbox("Select Tier", list(TIER_CONDITIONS.keys()))
-    
-    st.subheader("Tier Condition")
-    st.write(TIER_CONDITIONS[selected_tier]['condition'])
-    
-    st.subheader("Service Intervals")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("KMR Interval", f"{TIER_CONDITIONS[selected_tier]['service_interval_kmr']} km")
-    with col2:
-        st.metric("HMR Interval", f"{TIER_CONDITIONS[selected_tier]['service_interval_hmr']} hours")
-    
-    st.subheader("Replacement Thresholds")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("KMR Replacement", f"{TIER_CONDITIONS[selected_tier]['replacement_threshold_kmr']} km")
-    with col2:
-        st.metric("HMR Replacement", f"{TIER_CONDITIONS[selected_tier]['replacement_threshold_hmr']} hours")
-
-elif menu == "Service Schedule":
-    st.header("Service Scheduling and Maintenance")
-    
-    selected_tipper = st.selectbox("Select Tipper", list(st.session_state.tippers.keys()))
-    selected_tier = st.selectbox("Select Tier for this Tipper", list(TIER_CONDITIONS.keys()))
-    
-    st.subheader("Service Information")
-    if st.session_state.tippers[selected_tipper]['last_service']:
-        st.write(f"Last service: {st.session_state.tippers[selected_tipper]['last_service']}")
-    else:
-        st.warning("No service record found for this tipper")
-    
-    st.write(calculate_next_service(selected_tipper, selected_tier))
-    
-    if st.button("Record Service"):
-        record_service(selected_tipper)
-    
-    st.subheader("Service Checklist")
-    service_items = [
-        "Engine oil change",
-        "Oil filter replacement",
-        "Air filter check/replacement",
-        "Fuel filter replacement",
-        "Coolant level check",
-        "Brake system inspection",
-        "Tire pressure and condition check",
-        "Suspension inspection",
-        "Lights and electrical check",
-        "Hydraulic system check"
-    ]
-    
-    for item in service_items:
-        st.checkbox(item)
-    
-    st.subheader("Replacement Indicators")
-    tipper_data = st.session_state.tippers[selected_tipper]
-    tier_data = TIER_CONDITIONS[selected_tier]
-    
-    kmr_percent = (tipper_data['kmr'] / tier_data['replacement_threshold_kmr']) * 100
-    hmr_percent = (tipper_data['hmr'] / tier_data['replacement_threshold_hmr']) * 100
-    
-    st.progress(min(100, kmr_percent), text=f"KMR: {tipper_data['kmr']}/{tier_data['replacement_threshold_kmr']} km")
-    st.progress(min(100, hmr_percent), text=f"HMR: {tipper_data['hmr']}/{tier_data['replacement_threshold_hmr']} hours")
-    
-    if kmr_percent >= 100 or hmr_percent >= 100:
-        st.error("This tipper has reached replacement threshold!")
+if __name__ == "__main__":
+    main()
